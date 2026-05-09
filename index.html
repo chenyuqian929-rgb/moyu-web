@@ -4964,7 +4964,7 @@ function initResize(){
 }
 
 window.addEventListener('beforeunload',()=>dbSet(S.cfg,'lastActive',Date.now()));
-document.addEventListener('DOMContentLoaded', async ()=>{ try{ if(window.__loveV34PreflightRestore) await window.__loveV34PreflightRestore(); }catch(e){ console.warn('[ios-lite-v34] preflight skipped',e); } await init(); if(window.__iconManagerBoot) await window.__iconManagerBoot(); try{ if(window.__loveV34AfterInit) window.__loveV34AfterInit(); }catch(e){ console.warn('[ios-lite-v34] after init skipped',e); } });
+document.addEventListener('DOMContentLoaded', async ()=>{ await init(); if(window.__iconManagerBoot) await window.__iconManagerBoot(); });
 // 页面从后台回到前台时，自动补算离线期间的消息和朋友圈
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState !== 'visible') return;
@@ -12070,547 +12070,6 @@ document.addEventListener('DOMContentLoaded',()=>{ setTimeout(()=>{ bootEnhanced
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,500)); else setTimeout(boot,500);
 })();
 </script>
-
-
-<!-- v42: default dialog 1 name + contact1 moments + group sticker grid final fix -->
-<style id="v42-group-sticker-grid-final-style">
-/* v42：群聊表情包最终平铺修复。只作用于群聊弹层，不碰普通聊天表情包弹层。 */
-[id^="group-chat-page-"] .group-chat-sticker-wrap.active{display:block!important;max-width:100%!important;overflow:hidden!important;background:#fff!important;}
-[id^="group-chat-page-"] .group-chat-sticker-grid{
-  display:grid!important;
-  grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  gap:10px!important;
-  width:100%!important;
-  max-width:100%!important;
-  min-width:0!important;
-  padding:4px 0 2px!important;
-  overflow-y:auto!important;
-  overflow-x:hidden!important;
-  align-items:stretch!important;
-  justify-items:stretch!important;
-  background:#fff!important;
-}
-@media(min-width:520px){[id^="group-chat-page-"] .group-chat-sticker-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;}}
-[id^="group-chat-page-"] .group-chat-sticker-grid>.group-chat-sticker-item,
-[id^="group-chat-page-"] .group-chat-sticker-grid button.group-chat-sticker-item{
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  width:100%!important;
-  min-width:0!important;
-  max-width:100%!important;
-  aspect-ratio:1/1!important;
-  margin:0!important;
-  padding:0!important;
-  border-radius:12px!important;
-  overflow:hidden!important;
-  background:#f7f7f7!important;
-  border:1.5px solid rgba(230,164,180,.22)!important;
-  box-shadow:none!important;
-  float:none!important;
-  position:relative!important;
-  transform:none!important;
-}
-[id^="group-chat-page-"] .group-chat-sticker-grid>.group-chat-sticker-item img,
-[id^="group-chat-page-"] .group-chat-sticker-grid button.group-chat-sticker-item img{
-  display:block!important;
-  width:100%!important;
-  height:100%!important;
-  max-width:100%!important;
-  max-height:100%!important;
-  object-fit:cover!important;
-  margin:0!important;
-  padding:0!important;
-  border-radius:10px!important;
-  position:static!important;
-  transform:none!important;
-}
-[id^="group-chat-page-"] .group-chat-sticker-grid>.group-chat-sticker-empty-v42{grid-column:1/-1!important;padding:20px 10px!important;text-align:center!important;color:#8f8693!important;}
-</style>
-<script id="v42-default-dialog-moments-sticker-fix">
-(function(){
-  'use strict';
-  if(window.__v42DefaultDialogMomentsStickerFix) return;
-  window.__v42DefaultDialogMomentsStickerFix=true;
-  const TAG='[v42-default-dialog-fix]';
-  const MAIN_DB='LoveWithChenV6';
-  const NAME_MAP_KEY='LoveWithChen_contactNameMap_v42';
-  const NAME_FIELDS=['remark','alias','note','displayName','nickname','name','contactName'];
-  const str=v=>String(v==null?'':v);
-  const clean=v=>str(v).replace(/\s+/g,' ').trim();
-  function log(){try{console.log.apply(console,[TAG].concat([].slice.call(arguments)));}catch(e){}}
-  function warn(){try{console.warn.apply(console,[TAG].concat([].slice.call(arguments)));}catch(e){}}
-  function isGenericName(v){
-    const s=clean(v);
-    return !s || s==='联系人' || /^联系人\s*\d*$/i.test(s) || /^对话\s*\d+$/i.test(s) || /^win[_-]?\d+$/i.test(s) || /^contact\s*\d*$/i.test(s);
-  }
-  function safeName(v,fb){
-    const s=clean(v);
-    return (s || clean(fb) || '联系人').slice(0,24);
-  }
-  function bestName(obj,fb){
-    if(obj&&typeof obj==='object'){
-      for(const k of NAME_FIELDS){ const s=clean(obj[k]); if(s&&!isGenericName(s)) return safeName(s,fb); }
-      for(const k of NAME_FIELDS){ const s=clean(obj[k]); if(s) return safeName(s,fb); }
-    }
-    return safeName(fb,'联系人');
-  }
-  function stampName(obj,name){
-    if(!obj||typeof obj!=='object') return obj;
-    const s=safeName(name,bestName(obj,'联系人'));
-    obj.name=s; obj.remark=s; obj.alias=s; obj.note=s; obj.displayName=s; obj.contactName=s;
-    return obj;
-  }
-  function getWins(){ try{return Array.isArray(chatWindows)?chatWindows:[];}catch(e){return [];} }
-  function getActiveId(){ try{return clean(activeWinId)||((getWins()[0]&&getWins()[0].winId)||'win1');}catch(e){return 'win1';} }
-  function firstWin(){
-    const list=getWins();
-    return list.find(w=>clean(w&&w.winId)==='win1') || list[0] || null;
-  }
-  function firstId(){ const w=firstWin(); return clean(w&&w.winId)||'win1'; }
-  function readMap(){ try{ const raw=localStorage.getItem(NAME_MAP_KEY); const m=raw?JSON.parse(raw):{}; return m&&typeof m==='object'?m:{}; }catch(e){return {};} }
-  function writeMap(map){ try{ localStorage.setItem(NAME_MAP_KEY,JSON.stringify(map||{})); }catch(e){} }
-  function uiHeaderName(){
-    try{
-      const h=clean(document.getElementById('contact-name-display')&&document.getElementById('contact-name-display').textContent);
-      const m=clean(document.getElementById('moments-contact-name-title')&&document.getElementById('moments-contact-name-title').textContent).replace(/的朋友圈$/,'');
-      return !isGenericName(h)?h:(!isGenericName(m)?m:'');
-    }catch(e){return '';}
-  }
-  async function openMainDb(){
-    return await new Promise(res=>{
-      try{ const r=indexedDB.open(MAIN_DB); r.onsuccess=()=>res(r.result); r.onerror=()=>res(null); r.onblocked=()=>res(null); }
-      catch(e){res(null);}
-    });
-  }
-  function req(r){return new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error||new Error('idb error'));});}
-  function txDone(tx){return new Promise((res,rej)=>{tx.oncomplete=()=>res(true);tx.onerror=()=>rej(tx.error||new Error('tx error'));tx.onabort=()=>rej(tx.error||new Error('tx abort'));});}
-  async function cfgGetDirect(key,fb){
-    try{ if(typeof cfgGet==='function'){ const v=await cfgGet(key,fb); if(v!=null) return v; } }catch(e){}
-    try{ if(typeof dbGet==='function'){ const v=await dbGet((typeof S==='object'&&S&&S.cfg)||'config',key); if(v!=null) return v; } }catch(e){}
-    const db=await openMainDb(); if(!db) return fb;
-    try{ if(!db.objectStoreNames.contains('config')) return fb; const v=await req(db.transaction('config','readonly').objectStore('config').get(key)); return v==null?fb:v; }
-    catch(e){return fb;} finally{try{db.close();}catch(_){}}
-  }
-  async function cfgSetDirect(key,val){
-    try{ if(typeof cfgSet==='function') await cfgSet(key,val); }catch(e){}
-    try{ if(typeof dbSet==='function') await dbSet((typeof S==='object'&&S&&S.cfg)||'config',key,val); }catch(e){}
-    const db=await openMainDb(); if(!db) return;
-    try{ if(!db.objectStoreNames.contains('config')) return; const tx=db.transaction('config','readwrite'); tx.objectStore('config').put(val,key); await txDone(tx); }
-    catch(e){} finally{try{db.close();}catch(_){}}
-  }
-  async function putWindowDirect(win){
-    if(!win||!win.winId) return;
-    try{ if(typeof dbPut==='function') await dbPut((typeof S==='object'&&S&&S.windows)||'windows',win); }catch(e){}
-    const db=await openMainDb(); if(!db) return;
-    try{ if(!db.objectStoreNames.contains('windows')) return; const tx=db.transaction('windows','readwrite'); tx.objectStore('windows').put(win); await txDone(tx); }
-    catch(e){warn('put window failed',e);} finally{try{db.close();}catch(_){}}
-  }
-  function updateUiForActive(){
-    try{
-      const active=getWins().find(w=>clean(w&&w.winId)===getActiveId());
-      if(!active) return;
-      const n=bestName(active,'联系人');
-      const h=document.getElementById('contact-name-display'); if(h) h.textContent=n;
-      const p=document.getElementById('pm-contact-title'); if(p) p.textContent='管理'+n+'的词条库';
-      const r=document.getElementById('rn-title'); if(r) r.textContent=n+'的回复';
-      const t=document.getElementById('moments-contact-name-title'); if(t && clean(t.textContent)!=='朋友圈') t.textContent=n+'的朋友圈';
-      const c=document.getElementById('contact-settings-current-name'); if(c) c.textContent=n;
-    }catch(e){}
-  }
-  function repairDefaultDialog1Sync(reason){
-    try{
-      const w=firstWin(); if(!w) return false;
-      const fid=clean(w.winId)||'win1';
-      const map=readMap();
-      const header=(clean(getActiveId())===fid)?uiHeaderName():'';
-      let candidate='';
-      if(map[fid] && !isGenericName(map[fid])) candidate=map[fid];
-      else if(header && !isGenericName(header)) candidate=header;
-      else {
-        const own=bestName(w,'');
-        if(own && !isGenericName(own)) candidate=own;
-      }
-      if(!candidate) return false;
-      stampName(w,candidate);
-      map[fid]=candidate; writeMap(map);
-      if(clean(getActiveId())===fid) updateUiForActive();
-      setTimeout(()=>putWindowDirect(w).catch(()=>{}),0);
-      return true;
-    }catch(e){warn('sync repair failed',reason,e);return false;}
-  }
-  async function repairDefaultDialog1(reason){
-    try{
-      const w=firstWin(); if(!w) return false;
-      const fid=clean(w.winId)||'win1';
-      const map=readMap();
-      const cfgName=clean(await cfgGetDirect('contactName',''));
-      const own=bestName(w,'');
-      const header=(clean(getActiveId())===fid)?uiHeaderName():'';
-      let candidate='';
-      if(map[fid] && !isGenericName(map[fid])) candidate=map[fid];
-      else if(own && !isGenericName(own)) candidate=own;
-      else if(cfgName && !isGenericName(cfgName)) candidate=cfgName;
-      else if(header && !isGenericName(header)) candidate=header;
-      if(!candidate) return false;
-      const before=JSON.stringify(NAME_FIELDS.map(k=>w[k]||''));
-      stampName(w,candidate);
-      map[fid]=candidate; writeMap(map);
-      await putWindowDirect(w);
-      await cfgSetDirect('defaultDialog1Name_v42',candidate);
-      if(clean(getActiveId())===fid) await cfgSetDirect('contactName',candidate);
-      if(clean(getActiveId())===fid) updateUiForActive();
-      if(before!==JSON.stringify(NAME_FIELDS.map(k=>w[k]||''))) log('default dialog 1 name repaired',reason,candidate);
-      return true;
-    }catch(e){warn('repair default dialog failed',reason,e);return false;}
-  }
-  function validWinIds(){return new Set(getWins().map(w=>clean(w&&w.winId)).filter(Boolean));}
-  function matchesFirstName(val,firstName){
-    const s=clean(val); if(!s) return false;
-    return s===firstName || s==='联系人' || /^联系人\s*1?$/i.test(s) || /^对话\s*1$/i.test(s) || s==='legacy-contact';
-  }
-  function repairMomentObject(m, first, ids){
-    if(!m||typeof m!=='object') return false;
-    let changed=false;
-    const fid=clean(first&&first.winId)||'win1';
-    const fname=bestName(first,'联系人');
-    const sid=clean(m.senderId);
-    const sname=clean(m.senderName);
-    const shouldFirst=!sid || sid==='legacy-contact' || sid==='contact' || sid==='联系人' || (!ids.has(sid)&&matchesFirstName(sname,fname)) || (sid===fid);
-    if(shouldFirst){
-      if(m.senderId!==fid){m.senderId=fid;changed=true;}
-      if(clean(m.senderName)!==fname){m.senderName=fname;changed=true;}
-      if(!Object.prototype.hasOwnProperty.call(m,'senderAvatar')){m.senderAvatar=(first&&Object.prototype.hasOwnProperty.call(first,'avatar'))?(first.avatar||null):null;changed=true;}
-    }
-    if(!Array.isArray(m.comments)){m.comments=[];changed=true;}
-    (m.comments||[]).forEach(c=>{
-      if(!c||typeof c!=='object'||clean(c.author)==='你') return;
-      const aid=clean(c.authorId); const an=clean(c.authorName||c.author);
-      if(!aid || aid==='legacy-contact' || aid==='contact' || aid==='联系人' || (!ids.has(aid)&&matchesFirstName(an,fname))){
-        if(c.authorId!==fid){c.authorId=fid;changed=true;}
-        if(clean(c.authorName)!==fname){c.authorName=fname;changed=true;}
-        if(!Object.prototype.hasOwnProperty.call(c,'authorAvatar')){c.authorAvatar=(first&&Object.prototype.hasOwnProperty.call(first,'avatar'))?(first.avatar||null):null;changed=true;}
-      }
-    });
-    return changed;
-  }
-  async function repairPubMoments(reason){
-    try{
-      const first=firstWin(); if(!first) return 0;
-      const ids=validWinIds();
-      let changed=0;
-      if(Array.isArray(window.pubMoments)){
-        pubMoments.forEach(m=>{ if(repairMomentObject(m,first,ids)) changed++; });
-      }
-      const db=await openMainDb(); if(!db) return changed;
-      try{
-        if(!db.objectStoreNames.contains('publishedMoments')) return changed;
-        const tx=db.transaction('publishedMoments','readwrite');
-        const os=tx.objectStore('publishedMoments');
-        const list=await req(os.getAll());
-        for(const m of (list||[])){
-          if(repairMomentObject(m,first,ids)){ os.put(m); changed++; }
-        }
-        await txDone(tx);
-      }finally{try{db.close();}catch(_){}}
-      if(changed) log('moments owner repaired',reason,changed);
-      return changed;
-    }catch(e){warn('repair moments failed',reason,e);return 0;}
-  }
-  async function repairBeforeBackup(){
-    repairDefaultDialog1Sync('before-backup-sync');
-    await repairDefaultDialog1('before-backup');
-    await repairPubMoments('before-backup');
-  }
-  async function postImportRepair(){
-    try{
-      const db=await openMainDb(); if(!db) return;
-      try{
-        const stores=[];
-        ['windows','config','publishedMoments','chatPhrases','momentPhrases','stickers','momentPhotos'].forEach(st=>{if(db.objectStoreNames.contains(st)) stores.push(st);});
-        if(!stores.length) return;
-        const tx=db.transaction(stores,'readwrite');
-        const osWin=stores.includes('windows')?tx.objectStore('windows'):null;
-        const osCfg=stores.includes('config')?tx.objectStore('config'):null;
-        const wins=osWin?((await req(osWin.getAll()))||[]):[];
-        const first=wins.find(w=>clean(w&&w.winId)==='win1') || wins[0] || null;
-        const cfgName=osCfg?clean(await req(osCfg.get('contactName'))):'';
-        if(first){
-          let candidate=bestName(first,'');
-          if(isGenericName(candidate) && cfgName && !isGenericName(cfgName)) candidate=cfgName;
-          if(candidate && !isGenericName(candidate)){
-            stampName(first,candidate); osWin.put(first);
-            if(osCfg){ osCfg.put(candidate,'defaultDialog1Name_v42'); osCfg.put(candidate,'contactName'); }
-            const map=readMap(); map[clean(first.winId)||'win1']=candidate; writeMap(map);
-          }
-          const ids=new Set(wins.map(w=>clean(w&&w.winId)).filter(Boolean));
-          if(stores.includes('publishedMoments')){
-            const os=tx.objectStore('publishedMoments');
-            const list=(await req(os.getAll()))||[];
-            list.forEach(m=>{ if(repairMomentObject(m,first,ids)) os.put(m); });
-          }
-          ['chatPhrases','momentPhrases','stickers','momentPhotos'].forEach(st=>{
-            if(!stores.includes(st)) return;
-            const os=tx.objectStore(st);
-            try{ os.getAll().onsuccess=ev=>{ (ev.target.result||[]).forEach(item=>{ try{ if(item&&String(item.scopeType||item.scope||'').toLowerCase()==='contact'&&!clean(item.ownerId||item.contactId||item.winId)){ item.ownerId=clean(first.winId)||'win1'; os.put(item); } }catch(e){} }); }; }catch(e){}
-          });
-        }
-        await txDone(tx).catch(()=>{});
-      }finally{try{db.close();}catch(_){}}
-    }catch(e){warn('post import db repair failed',e);} 
-  }
-  function flattenGroupStickerGrid(){
-    try{
-      document.querySelectorAll('.group-chat-sticker-grid').forEach(grid=>{
-        const nested=Array.from(grid.querySelectorAll('.group-chat-sticker-item')).filter(item=>item.parentElement!==grid);
-        nested.forEach(item=>grid.appendChild(item));
-        Array.from(grid.children).forEach(ch=>{
-          if(!ch.classList||!ch.classList.contains('group-chat-sticker-item')){
-            if(!ch.querySelector || !ch.querySelector('.group-chat-sticker-item')){
-              if(clean(ch.textContent).includes('还没有表情包')) ch.classList.add('group-chat-sticker-empty-v42');
-            }
-          }
-        });
-      });
-    }catch(e){}
-  }
-  function installGroupStickerFix(){
-    const run=()=>setTimeout(flattenGroupStickerGrid,30);
-    document.addEventListener('click',e=>{ if(e.target&&e.target.closest&&e.target.closest('[id^="group-chat-menu-sticker-"],[id^="group-sticker-btn-"]')) run(); },true);
-    document.addEventListener('touchend',e=>{ if(e.target&&e.target.closest&&e.target.closest('[id^="group-chat-menu-sticker-"],[id^="group-sticker-btn-"]')) run(); },true);
-    try{ const mo=new MutationObserver(()=>flattenGroupStickerGrid()); mo.observe(document.body,{childList:true,subtree:true}); }catch(e){}
-    setInterval(flattenGroupStickerGrid,1200);
-  }
-  function wrapSwitchAndSave(){
-    const tryWrap=(name,wrap)=>{
-      try{
-        const old=window[name] || eval(name);
-        if(typeof old!=='function'||old.__v42Wrapped) return;
-        const fn=wrap(old); fn.__v42Wrapped=true;
-        try{ window[name]=fn; eval(name+'=fn'); }catch(e){ window[name]=fn; }
-      }catch(e){}
-    };
-    tryWrap('switchWin',old=>async function(id){ repairDefaultDialog1Sync('before-switch'); const r=await old.apply(this,arguments); await repairDefaultDialog1('after-switch'); return r; });
-    tryWrap('saveWins',old=>async function(){ repairDefaultDialog1Sync('before-saveWins'); const r=await old.apply(this,arguments); await repairDefaultDialog1('after-saveWins'); return r; });
-    tryWrap('renderActiveWindow',old=>function(){ repairDefaultDialog1Sync('before-render'); const r=old.apply(this,arguments); updateUiForActive(); return r; });
-  }
-  function installClickGuard(){
-    document.addEventListener('click',e=>{
-      if(e.target&&e.target.closest&&e.target.closest('#contact-settings-list [data-action="switch"],.contact-mini-btn[data-action="switch"]')) repairDefaultDialog1Sync('switch-click');
-    },true);
-    document.addEventListener('touchstart',e=>{
-      if(e.target&&e.target.closest&&e.target.closest('#contact-settings-list [data-action="switch"],.contact-mini-btn[data-action="switch"]')) repairDefaultDialog1Sync('switch-touch');
-    },true);
-  }
-  async function boot(){
-    wrapSwitchAndSave(); installClickGuard(); installGroupStickerFix();
-    repairDefaultDialog1Sync('boot-sync');
-    await repairDefaultDialog1('boot');
-    await repairPubMoments('boot');
-    setTimeout(()=>{wrapSwitchAndSave();repairDefaultDialog1('late-1');repairPubMoments('late-1');flattenGroupStickerGrid();},1200);
-    setTimeout(()=>{wrapSwitchAndSave();repairDefaultDialog1('late-2');flattenGroupStickerGrid();},3500);
-    log('loaded');
-  }
-  window.__v42RepairBeforeBackup=repairBeforeBackup;
-  window.__v42PostImportRepair=postImportRepair;
-  window.__v42RepairDefaultDialog1=repairDefaultDialog1;
-  window.__v42RepairContact1Moments=repairPubMoments;
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,500)); else setTimeout(boot,500);
-})();
-</script>
-
-
-
-<!-- ===== v46 朋友圈评论输入框稳定修复：禁止聚焦时自动重渲染 + iOS 16px 防缩放 ===== -->
-<style id="moment-comment-focus-fix-v46-style">
-  /* iOS 对小于 16px 的 input 会自动缩放/滚动，评论框会像“弹出后又被压下去” */
-  .moment-comments .comment-row{
-    align-items:center;
-    gap:8px;
-  }
-  .moment-comments .comment-input{
-    font-size:16px!important;
-    line-height:1.4!important;
-    min-height:36px;
-    -webkit-user-select:text;
-    user-select:text;
-    touch-action:manipulation;
-  }
-  .moment-comments .comment-submit{
-    min-height:36px;
-    white-space:nowrap;
-  }
-  .moments-container{
-    padding-bottom:calc(88px + env(safe-area-inset-bottom, 0px));
-  }
-  body.moment-comment-editing .moments-container{
-    scroll-behavior:auto!important;
-  }
-</style>
-<script id="moment-comment-focus-fix-v46">
-(function(){
-  'use strict';
-  const PATCH_TAG='[moment-comment-focus-fix-v46]';
-  const INPUT_SEL='#moments-container .comment-input';
-  let installed=false;
-  let allowRenderDepth=0;
-  let focusHoldUntil=0;
-  let lastFocusedMid=null;
-  let lastFocusedValue='';
-
-  function now(){ return Date.now(); }
-  function isMoments(){
-    try{ return typeof curPage!=='undefined' && curPage==='moments'; }catch(e){ return false; }
-  }
-  function container(){ return document.getElementById('moments-container'); }
-  function activeInput(){
-    const el=document.activeElement;
-    return (el && el.matches && el.matches(INPUT_SEL)) ? el : null;
-  }
-  function rememberInput(el){
-    if(!el) return;
-    try{ lastFocusedMid=String(el.dataset.mid||''); lastFocusedValue=String(el.value||''); }catch(e){}
-  }
-  function captureInput(){
-    const el=activeInput();
-    if(!el) return null;
-    let start=null,end=null;
-    try{ start=el.selectionStart; end=el.selectionEnd; }catch(e){}
-    return {
-      mid:String(el.dataset.mid||''),
-      value:String(el.value||''),
-      start,end,
-      top:(container()?container().scrollTop:0)
-    };
-  }
-  function restoreInput(cap){
-    if(!cap || !isMoments()) return;
-    const root=container();
-    if(!root) return;
-    const el=root.querySelector(`.comment-input[data-mid="${CSS.escape(String(cap.mid||''))}"]`);
-    if(!el) return;
-    try{
-      if(cap.value && !el.value) el.value=cap.value;
-      const btn=el.closest('.comment-row')?.querySelector('.comment-submit');
-      if(btn) btn.disabled=!String(el.value||'').trim();
-      if(document.body.classList.contains('moment-comment-editing')){
-        el.focus({preventScroll:true});
-        if(cap.start!=null && cap.end!=null) el.setSelectionRange(cap.start,cap.end);
-      }
-      if(root && cap.top!=null) root.scrollTop=cap.top;
-    }catch(e){}
-  }
-  function shouldBlockMomentRender(){
-    if(!isMoments()) return false;
-    if(allowRenderDepth>0) return false;
-    const el=activeInput();
-    if(el) return true;
-    // iOS 键盘刚弹出的一小段时间内，focus/pageshow/visible 触发的旧补丁渲染也先拦住，避免 DOM 被替换导致键盘收回。
-    return now()<focusHoldUntil;
-  }
-  function keepInputVisible(el){
-    if(!el || !isMoments()) return;
-    try{
-      el.scrollIntoView({block:'center', inline:'nearest', behavior:'smooth'});
-    }catch(e){
-      try{ el.scrollIntoView(false); }catch(_e){}
-    }
-  }
-  function patchRenderer(){
-    try{
-      const base=(typeof renderMomentsPage==='function')?renderMomentsPage:(window.renderMomentsPage||null);
-      if(!base || base.__momentCommentFocusFixV46) return;
-      const wrapped=function(options={}){
-        const cap=captureInput();
-        if(shouldBlockMomentRender()){
-          // 关键：评论框聚焦期间，v44 离线补偿/页面 focus/visible 引起的朋友圈重渲染会把 input 整个替换掉。
-          // 这里直接跳过自动重渲染，等提交、取消回复、失焦后再正常刷新。
-          return;
-        }
-        const out=base.apply(this,arguments);
-        if(cap){
-          requestAnimationFrame(()=>restoreInput(cap));
-          setTimeout(()=>restoreInput(cap),80);
-        }
-        return out;
-      };
-      wrapped.__momentCommentFocusFixV46=true;
-      try{ renderMomentsPage=wrapped; }catch(e){}
-      try{ window.renderMomentsPage=wrapped; }catch(e){}
-    }catch(e){ console.warn(PATCH_TAG,'renderer patch failed',e); }
-  }
-  function patchSubmit(){
-    try{
-      const base=(typeof submitCmt==='function')?submitCmt:(window.submitCmt||null);
-      if(!base || base.__momentCommentFocusFixV46) return;
-      const wrapped=async function(){
-        allowRenderDepth++;
-        try{ return await base.apply(this,arguments); }
-        finally{
-          setTimeout(()=>{ allowRenderDepth=Math.max(0,allowRenderDepth-1); },120);
-        }
-      };
-      wrapped.__momentCommentFocusFixV46=true;
-      try{ submitCmt=wrapped; }catch(e){}
-      try{ window.submitCmt=wrapped; }catch(e){}
-    }catch(e){ console.warn(PATCH_TAG,'submit patch failed',e); }
-  }
-  function patchReplyTarget(){
-    try{
-      const base=(typeof setMomentReplyTarget==='function')?setMomentReplyTarget:(window.setMomentReplyTarget||null);
-      if(!base || base.__momentCommentFocusFixV46) return;
-      const wrapped=function(){
-        allowRenderDepth++;
-        try{ return base.apply(this,arguments); }
-        finally{ setTimeout(()=>{ allowRenderDepth=Math.max(0,allowRenderDepth-1); },120); }
-      };
-      wrapped.__momentCommentFocusFixV46=true;
-      try{ setMomentReplyTarget=wrapped; }catch(e){}
-      try{ window.setMomentReplyTarget=wrapped; }catch(e){}
-    }catch(e){}
-  }
-  function installDelegates(){
-    if(installed) return;
-    installed=true;
-    document.addEventListener('focusin',function(e){
-      const el=e.target && e.target.matches && e.target.matches(INPUT_SEL) ? e.target : null;
-      if(!el) return;
-      document.body.classList.add('moment-comment-editing');
-      focusHoldUntil=now()+1800;
-      rememberInput(el);
-      setTimeout(()=>keepInputVisible(el),260);
-      setTimeout(()=>keepInputVisible(el),620);
-    },true);
-    document.addEventListener('input',function(e){
-      const el=e.target && e.target.matches && e.target.matches(INPUT_SEL) ? e.target : null;
-      if(el) rememberInput(el);
-    },true);
-    document.addEventListener('focusout',function(e){
-      const el=e.target && e.target.matches && e.target.matches(INPUT_SEL) ? e.target : null;
-      if(!el) return;
-      rememberInput(el);
-      // 延迟移除，避免“点发送按钮”时 input 先 blur、旧补丁趁机重渲染，导致点击丢失。
-      setTimeout(()=>{
-        if(!activeInput()){
-          document.body.classList.remove('moment-comment-editing');
-          focusHoldUntil=0;
-        }
-      },650);
-    },true);
-  }
-  function boot(tryCount=0){
-    patchRenderer();
-    patchSubmit();
-    patchReplyTarget();
-    installDelegates();
-    if(tryCount<40) setTimeout(()=>boot(tryCount+1),500);
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>boot(),300));
-  else setTimeout(()=>boot(),300);
-  console.log(PATCH_TAG,'loaded');
-})();
-</script>
-
 </body>
 </html>
 
@@ -13022,29 +12481,14 @@ document.addEventListener('DOMContentLoaded',()=>{ setTimeout(()=>{ bootEnhanced
     return `${mins}分钟`;
   }
   function getLetterContacts(){
-    const isGenericName=v=>/^联系人\s*\d*$/i.test(String(v||'').trim()) || /^对话\s*\d+$/i.test(String(v||'').trim());
-    return (Array.isArray(chatWindows)?chatWindows:[]).map((w,idx)=>{
-      const id=String((w&&w.winId)||'').trim();
-      const fields=[w&&w.remark,w&&w.alias,w&&w.note,w&&w.displayName,w&&w.nickname,w&&w.name];
-      let name='';
-      for(const v of fields){ const t=String(v||'').trim(); if(t && !isGenericName(t)){ name=t; break; } }
-      if(!name){ for(const v of fields){ const t=String(v||'').trim(); if(t){ name=t; break; } } }
-      return {id,name:name || (idx===0?'联系人':`联系人${idx+1}`)};
-    }).filter(c=>c.id);
+    return (Array.isArray(chatWindows)?chatWindows:[]).map(w=>({id:String((w&&w.winId)||''),name:String((w&&w.name)||'联系人').trim()||'联系人'})).filter(c=>c.id);
   }
   function getLetterContactName(contactId){
     const hit=getLetterContacts().find(c=>String(c.id)===String(contactId||''));
     return hit?hit.name:'联系人';
   }
-  function isValidLetterTarget(id){
-    const sid=String(id||'').trim();
-    return !!sid && getLetterContacts().some(c=>String(c.id)===sid);
-  }
   function defaultLetterTarget(){
     const contacts=getLetterContacts();
-    const select=document.getElementById('letter-target-select');
-    const selected=select&&String(select.value||'').trim();
-    if(selected && contacts.some(c=>String(c.id)===selected)) return selected;
     if(contacts.some(c=>String(c.id)===String(letterTargetId||''))) return String(letterTargetId);
     if(contacts.some(c=>String(c.id)===String(activeWinId||''))) return String(activeWinId||'');
     return contacts[0]?String(contacts[0].id):'win1';
@@ -13267,24 +12711,18 @@ document.addEventListener('DOMContentLoaded',()=>{ setTimeout(()=>{ bootEnhanced
     ensureLetterSettings();
     const input=document.getElementById('letter-input');
     const body=String(input?.value||'').trim();
-    const select=document.getElementById('letter-target-select');
-    let contactId=String((select&&select.value)||letterTargetId||defaultLetterTarget()).trim();
-    if(!isValidLetterTarget(contactId)) contactId=String(defaultLetterTarget()).trim();
+    const contactId=String(document.getElementById('letter-target-select')?.value||defaultLetterTarget());
     if(!body && !letterDraftImage){ showToast('信件内容和图片至少填写一项'); return; }
     const now=Date.now();
     const outId=typeof genId==='function'?genId():`letter_${now}_${Math.random().toString(36).slice(2,8)}`;
-    // v34：寄出瞬间锁死收信人和回信用词池，避免后面切联系人/页面刷新时偶发串到别的联系人。
-    letterTargetId=contactId;
-    const lockedReplyBody=buildLetterReplyBody(contactId);
-    const lockedContactName=getLetterContactName(contactId);
-    letters.push({id:outId,contactId,direction:'out',body,imageUrl:letterDraftImage||'',ts:now,read:true,targetContactId:contactId,targetName:lockedContactName});
-    pendingLetterReplies.push({id:`reply_${outId}`,contactId,targetContactId:contactId,targetName:lockedContactName,sourceId:outId,replyBody:lockedReplyBody,dueAt:now+getLetterReplyDelayMs()});
+    letters.push({id:outId,contactId,direction:'out',body,imageUrl:letterDraftImage||'',ts:now,read:true});
+    pendingLetterReplies.push({id:`reply_${outId}`,contactId,sourceId:outId,dueAt:now+getLetterReplyDelayMs()});
     await saveLetterState();
     if(typeof dbSet==='function' && typeof S==='object' && S.cfg){ await dbSet(S.cfg,'defaultLetterContactId',contactId).catch(()=>{}); }
     if(input){ input.value=''; syncLetterInputHeight(true); }
     clearLetterDraftImage();
     renderLetterThread();
-    showToast(`${lockedContactName}会在设定时长内回信`);
+    showToast(`${getLetterContactName(contactId)}会在设定时长内回信`);
   }
   async function markLettersRead(contactId, save=true){
     let changed=false;
@@ -13302,26 +12740,22 @@ document.addEventListener('DOMContentLoaded',()=>{ setTimeout(()=>{ bootEnhanced
       for(const task of (Array.isArray(pendingLetterReplies)?pendingLetterReplies:[])){
         if(!task) continue;
         if(Number(task.dueAt||0)<=now){
-          const contactId=String(task.targetContactId||task.contactId||'').trim();
+          const contactId=String(task.contactId||'');
           const win=(Array.isArray(chatWindows)?chatWindows:[]).find(w=>String((w&&w.winId)||'')===contactId);
-          if(!contactId || !win){ remain.push({...task,dueAt:now+60*1000}); continue; }
+          if(!win){ remain.push({...task,dueAt:now+60*1000}); continue; }
           const willRead=letterModalOpen && String(defaultLetterTarget())===contactId;
-          const replyBody=String(task.replyBody||'').trim() || buildLetterReplyBody(contactId);
-          const replyName=String(task.targetName||getLetterContactName(contactId)||win.name||'联系人').trim()||'联系人';
           letters.push({
             id:typeof genId==='function'?genId():`letter_in_${now}_${Math.random().toString(36).slice(2,8)}`,
             contactId,
-            targetContactId:contactId,
-            targetName:replyName,
             direction:'in',
-            body:replyBody,
+            body:buildLetterReplyBody(contactId),
             imageUrl:'',
             ts:now,
             read:!!willRead
           });
           changed=true;
           count++;
-          if(!willRead){ showToast(`${replyName}回信了`); }
+          if(!willRead){ showToast(`${win.name||'联系人'}回信了`); }
         }else remain.push(task);
       }
       pendingLetterReplies=remain;
@@ -17891,55 +17325,6 @@ plan.push({ sender: chosen.sender, replyItem, delay });
 })();
 </script>
 
-
-<script id="ios-lite-safety-v34">
-(function(){
-  'use strict';
-  if(window.__iosLiteSafetyV34) return;
-  window.__iosLiteSafetyV34=true;
-  const TAG='[ios-lite-v34]';
-  const VAULT_DB='LoveWithChen_IOSLiteVault_v34';
-  const VAULT_STORE='snapshots';
-  const MAIN_DB='LoveWithChenV6';
-  const MSG_DB='LoveWithChen_MsgDB_v1';
-  const META_KEY='LoveWithChen_IOSLiteV34_Meta';
-  const RESTORE_FLAG='LoveWithChen_IOSLiteV34_RestoredAt';
-  const MAIN_SCHEMA={config:{keyPath:null},chatPhrases:{keyPath:'id'},momentPhrases:{keyPath:'id'},stickers:{keyPath:'id'},windows:{keyPath:'winId'},publishedMoments:{keyPath:'id'},replyNotifs:{keyPath:'id'},pendingComments:{keyPath:'id'},bubThemes:{keyPath:'id'},momentPhotos:{keyPath:'id'}};
-  const MSG_SCHEMA={threads:{keyPath:'threadId'},messages:{keyPath:'mid'}}; // 媒体库不常驻快照，避免切界面卡顿。正式导出仍然是全量媒体。
-  const str=v=>String(v==null?'':v);
-  const sleep=ms=>new Promise(r=>setTimeout(r,ms||0));
-  const log=(...a)=>{try{console.log(TAG,...a)}catch(e){}};
-  const warn=(...a)=>{try{console.warn(TAG,...a)}catch(e){}};
-  function toast(msg){try{ if(typeof showToast==='function') showToast(msg); }catch(e){} }
-  function openDb(name,version,onUpgrade){return new Promise(resolve=>{try{const r=version?indexedDB.open(name,version):indexedDB.open(name);r.onupgradeneeded=e=>{try{onUpgrade&&onUpgrade(e.target.result,e)}catch(err){warn(err)}};r.onsuccess=()=>resolve(r.result);r.onerror=()=>resolve(null);r.onblocked=()=>resolve(null)}catch(e){resolve(null)}})}
-  function req(req){return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error||new Error('idb error'))})}
-  function txDone(tx){return new Promise((res,rej)=>{tx.oncomplete=()=>res(true);tx.onerror=()=>rej(tx.error||new Error('tx error'));tx.onabort=()=>rej(tx.error||new Error('tx abort'))})}
-  function isAppLocalKey(k){k=str(k);return /^LoveWithChen/i.test(k)||/^customIconMap_/i.test(k)||k==='hiddenBubThemes'||/^lettersBox_/i.test(k)||/^letterPendingReplies_/i.test(k)||/^letter/i.test(k)}
-  function isSafetyKey(k){return /IOSLite|IOSSafety|SafetyVault|StableBackup|BackupJson|backupJson|clean-export|Snapshot|snapshot|lastExport|导出|备份快照/i.test(str(k))}
-  function localStoragePack(){const out={};try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&isAppLocalKey(k)&&!isSafetyKey(k))out[k]=localStorage.getItem(k)}}catch(e){}return out}
-  function schemaFor(dbName,st){const m=dbName===MSG_DB?MSG_SCHEMA:MAIN_SCHEMA;const s=m[st]||{};return {keyPath:s.keyPath==null?null:s.keyPath,autoIncrement:false}}
-  function createStores(db, schema){Object.keys(schema||{}).forEach(st=>{if(db.objectStoreNames.contains(st))return;const s=schemaFor(db.name,st), opt={};if(s.keyPath!=null) opt.keyPath=s.keyPath;try{db.createObjectStore(st,opt)}catch(e){}})}
-  async function openVault(){return openDb(VAULT_DB,1,db=>{if(!db.objectStoreNames.contains(VAULT_STORE))db.createObjectStore(VAULT_STORE,{keyPath:'id'})})}
-  async function readStore(db,st,limit){try{if(!db.objectStoreNames.contains(st))return {schema:schemaFor(db.name,st),rows:[]};const tx=db.transaction(st,'readonly'), os=tx.objectStore(st);let vals=await req(os.getAll());let keys=[];try{keys=await req(os.getAllKeys())}catch(e){keys=vals.map((_,i)=>i)};if(limit&&vals.length>limit){vals=vals.slice(Math.max(0,vals.length-limit));keys=keys.slice(Math.max(0,keys.length-limit))}const rows=[];for(let i=0;i<vals.length;i++){rows.push({key:keys[i],value:vals[i]});if(i%80===79)await sleep(0)}return {schema:schemaFor(db.name,st),rows}}catch(e){warn('read store failed',db&&db.name,st,e);return {schema:schemaFor(db&&db.name,st),rows:[]}}}
-  async function readPack(dbName, schema){const db=await openDb(dbName);if(!db)return {name:dbName,stores:{}};try{const stores={};for(const st of Object.keys(schema)){const limit=(dbName===MSG_DB&&st==='messages')?5000:0;stores[st]=await readStore(db,st,limit);await sleep(0)}return {name:dbName,stores}}finally{try{db.close()}catch(e){}}}
-  function countRows(pack,st){try{return ((pack.stores&&pack.stores[st]&&pack.stores[st].rows)||[]).length}catch(e){return 0}}
-  function scoreOfPacks(packs,ls){let s=0;const main=(packs||[]).find(p=>p.name===MAIN_DB)||{};const msg=(packs||[]).find(p=>p.name===MSG_DB)||{};s+=countRows(main,'windows')*8;s+=countRows(main,'chatPhrases')*2;s+=countRows(main,'momentPhrases')*2;s+=countRows(main,'publishedMoments')*4;s+=countRows(main,'momentPhotos')*2;s+=countRows(main,'stickers')*2;s+=countRows(msg,'messages')*3;s+=countRows(msg,'threads')*2;try{const letters=JSON.parse((ls||{})['lettersBox_v1']||'[]');if(Array.isArray(letters))s+=letters.length*5}catch(e){}return s}
-  async function buildSnapshot(reason){const packs=[await readPack(MAIN_DB,MAIN_SCHEMA),await readPack(MSG_DB,MSG_SCHEMA)];const ls=localStoragePack();const score=scoreOfPacks(packs,ls);return {id:'latest',version:'ios-lite-v34',createdAt:Date.now(),createdAtISO:new Date().toISOString(),reason:str(reason||'manual'),score,packs,localStorage:ls}}
-  async function getLatest(){const db=await openVault();if(!db)return null;try{const tx=db.transaction(VAULT_STORE,'readonly');return await req(tx.objectStore(VAULT_STORE).get('latest'))}catch(e){return null}finally{try{db.close()}catch(e){}}}
-  let saving=false,lastSaveAt=0;
-  async function saveSnapshot(reason){if(saving)return;const now=Date.now();if(now-lastSaveAt<12000&&reason!=='pagehide'&&reason!=='visibility-hidden')return;saving=true;try{const snap=await buildSnapshot(reason);if(!snap||snap.score<10){log('skip low score snapshot',snap&&snap.score);return}const old=await getLatest();if(old&&Number(old.score||0)>snap.score+40&&snap.score<80){log('skip poorer snapshot',snap.score,'old',old.score);return}const db=await openVault();if(!db)return;try{const tx=db.transaction(VAULT_STORE,'readwrite');tx.objectStore(VAULT_STORE).put(snap);await txDone(tx);lastSaveAt=Date.now();try{localStorage.setItem(META_KEY,JSON.stringify({savedAt:lastSaveAt,score:snap.score}))}catch(e){}log('snapshot saved',reason,snap.score)}finally{try{db.close()}catch(e){}}}catch(e){warn('snapshot failed',e)}finally{saving=false}}
-  async function liveScore(){try{const packs=[await readPack(MAIN_DB,MAIN_SCHEMA),await readPack(MSG_DB,MSG_SCHEMA)];return scoreOfPacks(packs,localStoragePack())}catch(e){return 0}}
-  async function ensureDbWithStores(dbName,schema){let db=await openDb(dbName);if(!db){db=await openDb(dbName,1,d=>createStores(d,schema));return db}const missing=Object.keys(schema).filter(st=>!db.objectStoreNames.contains(st));if(missing.length){const ver=(db.version||1)+1;try{db.close()}catch(e){}db=await openDb(dbName,ver,d=>createStores(d,schema))}return db}
-  async function restorePack(pack){if(!pack||!pack.name||!pack.stores)return;const schema=pack.name===MSG_DB?MSG_SCHEMA:MAIN_SCHEMA;const db=await ensureDbWithStores(pack.name,schema);if(!db)return;try{const names=Object.keys(pack.stores).filter(st=>db.objectStoreNames.contains(st));if(!names.length)return;const tx=db.transaction(names,'readwrite');for(const st of names){const os=tx.objectStore(st);try{os.clear()}catch(e){}const info=pack.stores[st]||{};const rows=Array.isArray(info.rows)?info.rows:[];for(let i=0;i<rows.length;i++){const row=rows[i];try{if(os.keyPath==null)os.put(row.value,row.key);else os.put(row.value)}catch(e){}if(i%120===119)await sleep(0)}}await txDone(tx).catch(()=>{})}finally{try{db.close()}catch(e){}}}
-  async function restoreSnapshot(snap){if(!snap||!Array.isArray(snap.packs))return false;try{Object.keys(snap.localStorage||{}).forEach(k=>{if(k&&!isSafetyKey(k))try{localStorage.setItem(k,snap.localStorage[k])}catch(e){}});for(const p of snap.packs){await restorePack(p);await sleep(0)}try{localStorage.setItem(RESTORE_FLAG,String(Date.now()))}catch(e){}toast('已从iOS安全快照恢复记录');return true}catch(e){warn('restore failed',e);return false}}
-  window.__loveV34PreflightRestore=async function(){try{const snap=await getLatest();if(!snap||Number(snap.score||0)<20)return;const live=await liveScore();if(live+18<Number(snap.score||0)&&live<30){log('restore before init live=',live,'snap=',snap.score);await restoreSnapshot(snap)}}catch(e){warn('preflight failed',e)}};
-  window.__loveV34AfterInit=function(){setTimeout(()=>saveSnapshot('after-init'),7000)};
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveSnapshot('visibility-hidden')},true);
-  window.addEventListener('pagehide',()=>saveSnapshot('pagehide'),true);
-  // 不监听 click/change，不参与备份按钮，也不在切换页面时全量保存，避免 v33 那种刷新和卡顿。
-})();
-</script>
-
 <script id="clean-core-full-backup-v14">
 (function(){
   'use strict';
@@ -18040,7 +17425,6 @@ plan.push({ sender: chosen.sender, replyItem, delay });
   }
   function exportLocalStorage(){ const out={}; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&isAppLocalKey(k)&&!isBackupLikeKey(k)) out[k]=localStorage.getItem(k); } }catch(e){} return out; }
   async function syncBeforeExport(){
-    try{ if(window.__v42RepairBeforeBackup) await window.__v42RepairBeforeBackup(); }catch(e){ console.warn('[v42]', 'repair before export skipped', e); }
     try{ if(typeof openDB==='function') await openDB(); }catch(e){}
     try{
       if(Array.isArray(chatWindows)){
@@ -18242,7 +17626,6 @@ plan.push({ sender: chosen.sender, replyItem, delay });
           }
         }
       }catch(e){ console.warn(TAG,'post import repair skipped',e); }
-      try{ if(window.__v42PostImportRepair) await window.__v42PostImportRepair(); }catch(e){ console.warn('[v42]', 'post import repair skipped', e); }
       progress(`导入完成：${dbn}个数据库，${rows}条数据。正在刷新…`); setTimeout(()=>location.reload(),900);
     }catch(e){ console.error(TAG,e); toast('导入失败：'+(e&&e.message?e.message:e)); }
   }
@@ -18446,258 +17829,4 @@ plan.push({ sender: chosen.sender, replyItem, delay });
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
 })();
 </script>
-
-<script id="offline-catchup-final-v44">
-(function(){
-  'use strict';
-  /* =========================================================
-   * v44 离线主动消息 / 朋友圈补偿专项
-   * 基于 v42 小修：不碰导入导出、备注、群聊表情包。
-   * 解决：页面关闭/后台后 setInterval 停止，重新打开时没有按离线时间补发。
-   * 思路：下一次触发时间写入 IndexedDB + localStorage；回到页面后按 nextAt 补偿。
-   * ========================================================= */
-  const TAG='[offline-catchup-final-v44]';
-  const LS_PREFIX='LoveWithChen_v44_sched_';
-  const LS_SEEN=LS_PREFIX+'lastSeen';
-  const LS_BOOT=LS_PREFIX+'lastBoot';
-  const TIMER_MS=1000;
-  const MAX_PER_PASS=80; // 一次最多补 80 个，避免离线很久时卡死；下一轮会继续补。
-  let booted=false;
-  let resumeBusy=false;
-  let lastResumeAt=0;
-
-  function n(v){ const x=Number(v); return Number.isFinite(x)?x:0; }
-  function now(){ return Date.now(); }
-  function canRun(){
-    try{
-      return typeof dbGet==='function' && typeof dbSet==='function' && typeof S==='object' && S.cfg &&
-             typeof getRandMsgInterval==='function' && typeof getRandMomentInterval==='function' &&
-             typeof sendActiveToOwner==='function' && typeof sendMomentForOwner==='function' &&
-             Array.isArray(chatWindows) && chatWindows.length>0;
-    }catch(e){ return false; }
-  }
-  function ids(){
-    try{
-      const arr=(typeof getSchedContactIds==='function'?getSchedContactIds():chatWindows.map(w=>w&&w.winId));
-      return Array.from(new Set((arr||[]).map(x=>String(x||'').trim()).filter(Boolean)));
-    }catch(e){ return []; }
-  }
-  function lsRead(key){
-    try{ const raw=localStorage.getItem(LS_PREFIX+key); return raw?JSON.parse(raw):null; }catch(e){ return null; }
-  }
-  function lsWrite(key,val){
-    try{ localStorage.setItem(LS_PREFIX+key,JSON.stringify(val||{})); }catch(e){}
-  }
-  function markSeenSync(reason){
-    const t=now();
-    try{ localStorage.setItem(LS_SEEN,String(t)); }catch(e){}
-    try{ localStorage.setItem(LS_BOOT,String(t)); }catch(e){}
-    try{ if(typeof dbSet==='function' && typeof S==='object' && S.cfg){ dbSet(S.cfg,'lastActive',t); dbSet(S.cfg,'schedulerLastSeenV44',t); } }catch(e){}
-  }
-  async function baseTime(cur){
-    let t=0;
-    try{ t=n(localStorage.getItem(LS_SEEN)); }catch(e){}
-    if(!(t>0)){ try{ t=n(await dbGet(S.cfg,'schedulerLastSeenV44')); }catch(e){} }
-    if(!(t>0)){ try{ t=n(await dbGet(S.cfg,'schedulerLastSeenV19')); }catch(e){} }
-    if(!(t>0)){ try{ t=n(await dbGet(S.cfg,'lastActive')); }catch(e){} }
-    if(!(t>0) || t>cur+60000) t=cur;
-    return t;
-  }
-  async function readMap(key){
-    let map=null;
-    try{ const raw=await dbGet(S.cfg,key); if(raw && typeof raw==='object' && !Array.isArray(raw)) map={...raw}; }catch(e){}
-    const local=lsRead(key);
-    if(local && typeof local==='object'){
-      // localStorage 是同步写入的，iOS 杀后台时比 IndexedDB 更容易保住最后一次排期。
-      if(!map || !Object.keys(map).length) map={...local};
-      else{
-        for(const k of Object.keys(local)){
-          const a=n(map[k]); const b=n(local[k]);
-          if(b>0 && (!(a>0) || b<a)) map[k]=b;
-        }
-      }
-    }
-    return (map && typeof map==='object')?map:{};
-  }
-  async function writeMap(key,map){
-    const clean={};
-    for(const id of ids()){
-      const v=n(map&&map[id]);
-      if(v>0) clean[id]=v;
-    }
-    lsWrite(key,clean);
-    try{ await dbSet(S.cfg,key,clean); }catch(e){}
-    return clean;
-  }
-  async function primeMap(key,randFn,opts={}){
-    const cur=n(opts.now)||now();
-    const reset=!!opts.reset;
-    const allIds=ids();
-    const base=await baseTime(cur);
-    const raw=await readMap(key);
-    const out={};
-    let changed=reset;
-    for(const id of allIds){
-      let next=n(raw[id]);
-      if(reset || !(next>0)){
-        next=base+n(randFn());
-        changed=true;
-      }
-      // 设备时间变化或脏数据：超过 30 天未来就重新排。
-      if(next>cur+30*24*60*60*1000){ next=cur+n(randFn()); changed=true; }
-      out[id]=next;
-      if(n(raw[id])!==next) changed=true;
-    }
-    if(Object.keys(raw).some(k=>!allIds.includes(String(k)))) changed=true;
-    if(changed) await writeMap(key,out);
-    return out;
-  }
-  function pickDue(map,allIds,cur){
-    let best=null;
-    for(const id of allIds){
-      const ts=n(map[id]);
-      if(ts>0 && ts<=cur && (!best || ts<best.ts)) best={id,ts};
-    }
-    return best;
-  }
-  async function yieldSoon(i){ if(i>0 && i%12===0) await new Promise(r=>setTimeout(r,0)); }
-
-  async function processMessages(opts={}){
-    if(typeof activeScheduleBusy!=='undefined' && activeScheduleBusy) return 0;
-    if(typeof activeScheduleBusy!=='undefined') activeScheduleBusy=true;
-    try{
-      const cur=n(opts.now)||now();
-      const allIds=ids();
-      const map=await primeMap(ACTIVE_MSG_SCHEDULE_KEY,getRandMsgInterval,{now:cur,reset:!!opts.reset});
-      let count=0, loops=0, changed=false;
-      while(loops<MAX_PER_PASS){
-        const due=pickDue(map,allIds,cur);
-        if(!due) break;
-        const ok=await sendActiveToOwner(due.id,due.ts,{toast:opts.toast===true});
-        if(ok) count++;
-        map[due.id]=due.ts+n(getRandMsgInterval());
-        loops++; changed=true;
-        await yieldSoon(loops);
-      }
-      for(const id of allIds){ if(!(n(map[id])>0)){ map[id]=cur+n(getRandMsgInterval()); changed=true; } }
-      if(changed) await writeMap(ACTIVE_MSG_SCHEDULE_KEY,map);
-      try{ await dbSet(S.cfg,'schedulerLastTickV44',cur); }catch(e){}
-      return count;
-    }catch(e){ console.warn(TAG,'message catchup failed',e); return 0; }
-    finally{ if(typeof activeScheduleBusy!=='undefined') activeScheduleBusy=false; }
-  }
-  async function processMoments(opts={}){
-    if(typeof momentScheduleBusy!=='undefined' && momentScheduleBusy) return 0;
-    if(typeof momentScheduleBusy!=='undefined') momentScheduleBusy=true;
-    try{
-      const cur=n(opts.now)||now();
-      const allIds=ids();
-      const map=await primeMap(ACTIVE_MOMENT_SCHEDULE_KEY,getRandMomentInterval,{now:cur,reset:!!opts.reset});
-      let count=0, loops=0, changed=false;
-      while(loops<MAX_PER_PASS){
-        const due=pickDue(map,allIds,cur);
-        if(!due) break;
-        const ok=await sendMomentForOwner(due.id,due.ts);
-        if(ok) count++;
-        map[due.id]=due.ts+n(getRandMomentInterval());
-        loops++; changed=true;
-        await yieldSoon(loops);
-      }
-      for(const id of allIds){ if(!(n(map[id])>0)){ map[id]=cur+n(getRandMomentInterval()); changed=true; } }
-      if(changed) await writeMap(ACTIVE_MOMENT_SCHEDULE_KEY,map);
-      try{ if(typeof pubMoments!=='undefined' && Array.isArray(pubMoments)) pubMoments.sort((a,b)=>n(b&&b.ts||b&&b.id)-n(a&&a.ts||a&&a.id)); }catch(e){}
-      try{ await dbSet(S.cfg,'schedulerLastTickV44',cur); }catch(e){}
-      return count;
-    }catch(e){ console.warn(TAG,'moment catchup failed',e); return 0; }
-    finally{ if(typeof momentScheduleBusy!=='undefined') momentScheduleBusy=false; }
-  }
-  function showNotice(msgs,moments){
-    try{
-      if(!(msgs||moments)) return;
-      const parts=[];
-      if(msgs) parts.push(`${msgs} 条主动消息`);
-      if(moments) parts.push(`${moments} 条朋友圈`);
-      const el=document.getElementById('offline-notif-text');
-      const box=document.getElementById('offline-notif');
-      if(el) el.textContent=`离线期间已补上 ${parts.join(' 和 ')} 💌`;
-      if(box) box.classList.add('show');
-    }catch(e){}
-  }
-  async function resume(reason,show=true){
-    if(resumeBusy || !canRun()) return {missedMsgs:0,missedMoments:0};
-    const cur=now();
-    if(cur-lastResumeAt<600 && reason!=='boot') return {missedMsgs:0,missedMoments:0};
-    lastResumeAt=cur;
-    resumeBusy=true;
-    try{
-      if(typeof checkCmtReplies==='function') await checkCmtReplies().catch(()=>{});
-      const missedMsgs=await processMessages({now:cur,toast:false});
-      const missedMoments=await processMoments({now:cur});
-      if(show) showNotice(missedMsgs,missedMoments);
-      if(typeof renderMomentsPage==='function' && curPage==='moments') renderMomentsPage({keepScroll:true});
-      if(typeof renderActiveWindow==='function' && curPage==='chat') renderActiveWindow();
-      markSeenSync(reason||'resume');
-      return {missedMsgs,missedMoments};
-    }finally{ resumeBusy=false; }
-  }
-
-  // 覆盖旧入口：后续所有前台计时/离线补算都走 v44。
-  try{ ensureScheduleMap = async function(key,randFn,opts={}){ return await primeMap(key,randFn,opts); }; }catch(e){}
-  try{ processDueScheduledMessages = async function(opts={}){ return await processMessages(opts); }; }catch(e){}
-  try{ processDueScheduledMoments = async function(opts={}){ return await processMoments(opts); }; }catch(e){}
-  try{ checkOfflineEvents = async function(opts={}){ return await resume((opts&&opts.reason)||'check',false); }; }catch(e){}
-  try{
-    startActiveMessages = async function(){
-      if(activeTimer) clearInterval(activeTimer);
-      await primeMap(ACTIVE_MSG_SCHEDULE_KEY,getRandMsgInterval);
-      await processMessages({toast:true});
-      activeTimer=setInterval(()=>processMessages({toast:true}).catch(e=>console.warn(TAG,e)),TIMER_MS);
-    };
-    startMoments = async function(){
-      if(momentTimer) clearInterval(momentTimer);
-      await primeMap(ACTIVE_MOMENT_SCHEDULE_KEY,getRandMomentInterval);
-      await processMoments().catch(e=>console.warn(TAG,e));
-      momentTimer=setInterval(()=>processMoments().catch(e=>console.warn(TAG,e)),TIMER_MS);
-    };
-    resetAllActiveSchedules = async function(kind){
-      if(kind==='moment'){
-        await primeMap(ACTIVE_MOMENT_SCHEDULE_KEY,getRandMomentInterval,{reset:true});
-        return startMoments();
-      }
-      await primeMap(ACTIVE_MSG_SCHEDULE_KEY,getRandMsgInterval,{reset:true});
-      return startActiveMessages();
-    };
-  }catch(e){}
-
-  function boot(){
-    if(booted || !canRun()) return;
-    booted=true;
-    resume('boot',true).then(()=>{
-      try{ startActiveMessages(); startMoments(); }catch(e){}
-      console.log(TAG,'loaded');
-    }).catch(e=>{ booted=false; console.warn(TAG,'boot failed',e); });
-  }
-  function waitBoot(i=0){
-    if(canRun()) boot();
-    else if(i<120) setTimeout(()=>waitBoot(i+1),250);
-  }
-
-  window.addEventListener('pagehide',()=>markSeenSync('pagehide'),{capture:true});
-  window.addEventListener('beforeunload',()=>markSeenSync('beforeunload'),{capture:true});
-  window.addEventListener('blur',()=>markSeenSync('blur'),{capture:true});
-  document.addEventListener('visibilitychange',()=>{
-    if(document.hidden){ markSeenSync('hidden'); return; }
-    setTimeout(()=>resume('visible',true).then(()=>{ try{ startActiveMessages(); startMoments(); }catch(e){} }),120);
-  },true);
-  window.addEventListener('pageshow',()=>setTimeout(()=>resume('pageshow',true).then(()=>{ try{ startActiveMessages(); startMoments(); }catch(e){} }),180),{capture:true});
-  window.addEventListener('focus',()=>setTimeout(()=>resume('focus',true).then(()=>{ try{ startActiveMessages(); startMoments(); }catch(e){} }),250),{capture:true});
-
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>waitBoot(),1200));
-  else setTimeout(()=>waitBoot(),1200);
-})();
-</script>
-<style id="offline-catchup-final-v44-style">
-/* v42 原 CSS 把 .offline-notif.show 强制 display:none；离线补偿需要能提示一下。 */
-.offline-notif.show{display:flex!important}
-</style>
 
