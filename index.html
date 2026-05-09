@@ -12419,6 +12419,198 @@ document.addEventListener('DOMContentLoaded',()=>{ setTimeout(()=>{ bootEnhanced
 })();
 </script>
 
+
+
+<!-- ===== v46 朋友圈评论输入框稳定修复：禁止聚焦时自动重渲染 + iOS 16px 防缩放 ===== -->
+<style id="moment-comment-focus-fix-v46-style">
+  /* iOS 对小于 16px 的 input 会自动缩放/滚动，评论框会像“弹出后又被压下去” */
+  .moment-comments .comment-row{
+    align-items:center;
+    gap:8px;
+  }
+  .moment-comments .comment-input{
+    font-size:16px!important;
+    line-height:1.4!important;
+    min-height:36px;
+    -webkit-user-select:text;
+    user-select:text;
+    touch-action:manipulation;
+  }
+  .moment-comments .comment-submit{
+    min-height:36px;
+    white-space:nowrap;
+  }
+  .moments-container{
+    padding-bottom:calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+  body.moment-comment-editing .moments-container{
+    scroll-behavior:auto!important;
+  }
+</style>
+<script id="moment-comment-focus-fix-v46">
+(function(){
+  'use strict';
+  const PATCH_TAG='[moment-comment-focus-fix-v46]';
+  const INPUT_SEL='#moments-container .comment-input';
+  let installed=false;
+  let allowRenderDepth=0;
+  let focusHoldUntil=0;
+  let lastFocusedMid=null;
+  let lastFocusedValue='';
+
+  function now(){ return Date.now(); }
+  function isMoments(){
+    try{ return typeof curPage!=='undefined' && curPage==='moments'; }catch(e){ return false; }
+  }
+  function container(){ return document.getElementById('moments-container'); }
+  function activeInput(){
+    const el=document.activeElement;
+    return (el && el.matches && el.matches(INPUT_SEL)) ? el : null;
+  }
+  function rememberInput(el){
+    if(!el) return;
+    try{ lastFocusedMid=String(el.dataset.mid||''); lastFocusedValue=String(el.value||''); }catch(e){}
+  }
+  function captureInput(){
+    const el=activeInput();
+    if(!el) return null;
+    let start=null,end=null;
+    try{ start=el.selectionStart; end=el.selectionEnd; }catch(e){}
+    return {
+      mid:String(el.dataset.mid||''),
+      value:String(el.value||''),
+      start,end,
+      top:(container()?container().scrollTop:0)
+    };
+  }
+  function restoreInput(cap){
+    if(!cap || !isMoments()) return;
+    const root=container();
+    if(!root) return;
+    const el=root.querySelector(`.comment-input[data-mid="${CSS.escape(String(cap.mid||''))}"]`);
+    if(!el) return;
+    try{
+      if(cap.value && !el.value) el.value=cap.value;
+      const btn=el.closest('.comment-row')?.querySelector('.comment-submit');
+      if(btn) btn.disabled=!String(el.value||'').trim();
+      if(document.body.classList.contains('moment-comment-editing')){
+        el.focus({preventScroll:true});
+        if(cap.start!=null && cap.end!=null) el.setSelectionRange(cap.start,cap.end);
+      }
+      if(root && cap.top!=null) root.scrollTop=cap.top;
+    }catch(e){}
+  }
+  function shouldBlockMomentRender(){
+    if(!isMoments()) return false;
+    if(allowRenderDepth>0) return false;
+    const el=activeInput();
+    if(el) return true;
+    // iOS 键盘刚弹出的一小段时间内，focus/pageshow/visible 触发的旧补丁渲染也先拦住，避免 DOM 被替换导致键盘收回。
+    return now()<focusHoldUntil;
+  }
+  function keepInputVisible(el){
+    if(!el || !isMoments()) return;
+    try{
+      el.scrollIntoView({block:'center', inline:'nearest', behavior:'smooth'});
+    }catch(e){
+      try{ el.scrollIntoView(false); }catch(_e){}
+    }
+  }
+  function patchRenderer(){
+    try{
+      const base=(typeof renderMomentsPage==='function')?renderMomentsPage:(window.renderMomentsPage||null);
+      if(!base || base.__momentCommentFocusFixV46) return;
+      const wrapped=function(options={}){
+        const cap=captureInput();
+        if(shouldBlockMomentRender()){
+          // 关键：评论框聚焦期间，v44 离线补偿/页面 focus/visible 引起的朋友圈重渲染会把 input 整个替换掉。
+          // 这里直接跳过自动重渲染，等提交、取消回复、失焦后再正常刷新。
+          return;
+        }
+        const out=base.apply(this,arguments);
+        if(cap){
+          requestAnimationFrame(()=>restoreInput(cap));
+          setTimeout(()=>restoreInput(cap),80);
+        }
+        return out;
+      };
+      wrapped.__momentCommentFocusFixV46=true;
+      try{ renderMomentsPage=wrapped; }catch(e){}
+      try{ window.renderMomentsPage=wrapped; }catch(e){}
+    }catch(e){ console.warn(PATCH_TAG,'renderer patch failed',e); }
+  }
+  function patchSubmit(){
+    try{
+      const base=(typeof submitCmt==='function')?submitCmt:(window.submitCmt||null);
+      if(!base || base.__momentCommentFocusFixV46) return;
+      const wrapped=async function(){
+        allowRenderDepth++;
+        try{ return await base.apply(this,arguments); }
+        finally{
+          setTimeout(()=>{ allowRenderDepth=Math.max(0,allowRenderDepth-1); },120);
+        }
+      };
+      wrapped.__momentCommentFocusFixV46=true;
+      try{ submitCmt=wrapped; }catch(e){}
+      try{ window.submitCmt=wrapped; }catch(e){}
+    }catch(e){ console.warn(PATCH_TAG,'submit patch failed',e); }
+  }
+  function patchReplyTarget(){
+    try{
+      const base=(typeof setMomentReplyTarget==='function')?setMomentReplyTarget:(window.setMomentReplyTarget||null);
+      if(!base || base.__momentCommentFocusFixV46) return;
+      const wrapped=function(){
+        allowRenderDepth++;
+        try{ return base.apply(this,arguments); }
+        finally{ setTimeout(()=>{ allowRenderDepth=Math.max(0,allowRenderDepth-1); },120); }
+      };
+      wrapped.__momentCommentFocusFixV46=true;
+      try{ setMomentReplyTarget=wrapped; }catch(e){}
+      try{ window.setMomentReplyTarget=wrapped; }catch(e){}
+    }catch(e){}
+  }
+  function installDelegates(){
+    if(installed) return;
+    installed=true;
+    document.addEventListener('focusin',function(e){
+      const el=e.target && e.target.matches && e.target.matches(INPUT_SEL) ? e.target : null;
+      if(!el) return;
+      document.body.classList.add('moment-comment-editing');
+      focusHoldUntil=now()+1800;
+      rememberInput(el);
+      setTimeout(()=>keepInputVisible(el),260);
+      setTimeout(()=>keepInputVisible(el),620);
+    },true);
+    document.addEventListener('input',function(e){
+      const el=e.target && e.target.matches && e.target.matches(INPUT_SEL) ? e.target : null;
+      if(el) rememberInput(el);
+    },true);
+    document.addEventListener('focusout',function(e){
+      const el=e.target && e.target.matches && e.target.matches(INPUT_SEL) ? e.target : null;
+      if(!el) return;
+      rememberInput(el);
+      // 延迟移除，避免“点发送按钮”时 input 先 blur、旧补丁趁机重渲染，导致点击丢失。
+      setTimeout(()=>{
+        if(!activeInput()){
+          document.body.classList.remove('moment-comment-editing');
+          focusHoldUntil=0;
+        }
+      },650);
+    },true);
+  }
+  function boot(tryCount=0){
+    patchRenderer();
+    patchSubmit();
+    patchReplyTarget();
+    installDelegates();
+    if(tryCount<40) setTimeout(()=>boot(tryCount+1),500);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>boot(),300));
+  else setTimeout(()=>boot(),300);
+  console.log(PATCH_TAG,'loaded');
+})();
+</script>
+
 </body>
 </html>
 
